@@ -35,7 +35,14 @@ jobs:
           repos=(android_device_motorola_nio android_device_motorola_sm8250-common android_kernel_motorola_sm8250 android_hardware_motorola)
           refs=()
           for repo in "${repos[@]}"; do
-            sha=$(git -c http.version=HTTP/1.1 ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch" | awk '{print $1}')
+            sha=
+            for attempt in 1 2 3; do
+              if remote_ref=$(git -c http.version=HTTP/1.1 ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch"); then
+                sha=$(awk '{print $1}' <<< "$remote_ref")
+                [[ "$sha" =~ ^[0-9a-f]{40}$ ]] && break
+              fi
+              sleep $((attempt * 5))
+            done
             [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Cannot resolve $repo $branch"; exit 1; }
             refs+=("$repo=$sha")
           done
