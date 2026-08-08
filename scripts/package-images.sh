@@ -29,4 +29,4 @@ printf '%s\n' \
   'vendor_boot.img is retained from the matching official LineageOS build; nio vendor_boot contains ramdisk and dtb, not the kernel.' \
   'dtbo.img is retained from the matching official LineageOS build; built DTB/DTBO files are in the parent artifact.' \
   > "$out/README.txt"
-sha256sum "$out"/*.img > "$out/SHA256SUMS"
+(cd "$out" && sha256sum ./*.img > SHA256SUMS)
