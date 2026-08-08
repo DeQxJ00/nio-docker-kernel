@@ -53,29 +53,28 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .ci-work/toolchain
-          key: aosp-clang-r416183b-3f17560d9bd078537f29294c2bcf80b591821a09-v2
-      - name: Download AOSP Clang r416183b archive
+          key: aosp-clang-r416183b-3f17560d9bd078537f29294c2bcf80b591821a09-v3
+      - name: Fetch AOSP Clang r416183b from pinned commit
         if: steps.clang-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09/clang-r416183b.tar.gz'
-          mkdir -p .ci-work
-          curl --fail --silent --show-error --location --retry 5 --retry-all-errors --connect-timeout 30 "$url" -o .ci-work/clang.tar.gz
-      - name: Extract AOSP Clang r416183b
-        if: steps.clang-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .ci-work/toolchain/clang-r416183b
-          tar -xzf .ci-work/clang.tar.gz -C .ci-work/toolchain/clang-r416183b
+          repo=.ci-work/clang-repo
+          mkdir -p .ci-work/toolchain
+          git init "$repo"
+          git -C "$repo" remote add origin https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86
+          git -C "$repo" sparse-checkout init --cone
+          git -C "$repo" sparse-checkout set clang-r416183b
+          git -C "$repo" fetch --depth=1 origin 3f17560d9bd078537f29294c2bcf80b591821a09
+          git -C "$repo" checkout --detach FETCH_HEAD
+          mv "$repo/clang-r416183b" .ci-work/toolchain/clang-r416183b
       - name: Verify AOSP Clang r416183b contents
         if: steps.clang-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          # Gitiles regenerates gzip containers, so their archive SHA-256 is not
-          # stable. Verify immutable files from the pinned commit instead.
+          # The Git commit pins transport content; these checks also guard the
+          # selected toolchain directory and expected Android compiler build.
           (
             cd .ci-work/toolchain/clang-r416183b
             printf '%s\n' \
