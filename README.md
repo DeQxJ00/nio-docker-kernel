@@ -16,7 +16,7 @@ The kernel is configured in the same order as the official device tree: `vendor/
 2. Enable Actions and allow the workflow to create releases. It uses the repository `GITHUB_TOKEN`; no personal token is required.
 3. For flashable `boot.img`, `vendor_boot.img`, and `dtbo.img`, configure repository variable `BASE_IMAGES_URL` for a ZIP containing matching images, secret `BASE_IMAGES_SHA256`, and variable `MAGISKBOOT_URL` for a trusted pinned MagiskBoot binary. These matching base images are intentionally not checked in.
 
-The schedule runs daily at 03:17 UTC and `workflow_dispatch` supports `force`. Changes pushed to the workflow, build scripts, kernel fragment, patches, or upstream mapping also run the resolver so CI changes are tested immediately. The resolver hashes the four official branch heads and skips a coordinate already marked by a `ci-state-*` tag. A changed coordinate is cloned, configured, built for arm64, uploaded as an artifact, and released only after success. Failed runs remain in Actions with their logs.
+The schedule runs daily at 03:17 UTC, every push to `master` runs the workflow, and `workflow_dispatch` supports `force`. The resolver hashes the four official branch heads and skips a coordinate already marked by a `ci-state-*` tag, so a normal push does not rebuild an already successful upstream coordinate. A changed coordinate is cloned, configured, built for arm64, uploaded as an artifact, and released only after success. Failed runs remain in Actions with their logs.
 
 ## Artifacts and safety
 

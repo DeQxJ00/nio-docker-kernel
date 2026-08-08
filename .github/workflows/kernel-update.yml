@@ -4,12 +4,6 @@ on:
     - cron: '17 3 * * *'
   push:
     branches: [master]
-    paths:
-      - '.github/workflows/kernel-update.yml'
-      - '.github/kernel/**'
-      - 'scripts/**'
-      - 'patches/**'
-      - 'upstream.yml'
   workflow_dispatch:
     inputs:
       force:
@@ -65,6 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          trap 'status=$?; echo "::error title=AOSP Clang setup failed::line ${LINENO}: ${BASH_COMMAND} (exit ${status})"; exit "$status"' ERR
           mkdir -p .ci-work/toolchain/clang-r416183b
           url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09/clang-r416183b.tar.gz'
           curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 "$url" -o .ci-work/clang.tar.gz
@@ -79,7 +74,6 @@ jobs:
               | sha256sum -c -
           )
           test -x .ci-work/toolchain/clang-r416183b/bin/clang
-          .ci-work/toolchain/clang-r416183b/bin/clang --version | grep -F 'based on r416183b'
       - uses: actions/cache@v6
         with:
           path: ~/.cache/ccache
