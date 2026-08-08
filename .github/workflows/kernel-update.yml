@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .ci-work/toolchain
-          key: aosp-clang-r416183b-3f17560d9bd078537f29294c2bcf80b591821a09
+          key: aosp-clang-r416183b-3f17560d9bd078537f29294c2bcf80b591821a09-v2
       - name: Download verified AOSP Clang r416183b
         if: steps.clang-cache.outputs.cache-hit != 'true'
         shell: bash
@@ -59,10 +59,17 @@ jobs:
           set -euo pipefail
           mkdir -p .ci-work/toolchain/clang-r416183b
           url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09/clang-r416183b.tar.gz'
-          curl --fail --location --retry 3 "$url" -o .ci-work/clang.tar.gz
-          echo '0197db36b7cce8a7fd43a68862a6ab9ba2cdc88a646384ec84576eee84461a37  .ci-work/clang.tar.gz' | sha256sum -c -
+          curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 "$url" -o .ci-work/clang.tar.gz
           tar -xzf .ci-work/clang.tar.gz -C .ci-work/toolchain/clang-r416183b
+          # Gitiles regenerates gzip containers, so their archive SHA-256 is not
+          # stable. Verify immutable files from the pinned commit instead.
+          (
+            cd .ci-work/toolchain/clang-r416183b
+            echo '0fb5c52dfcf5194e12bd735e011f51267cf1aad8179b6f36adc49510553f3e7e  AndroidVersion.txt'
+            echo 'ae3fc0a3e2db8deea63b1ac0b2fc2c54c1e9c80c2406b8c9e80f78da67ba2513  manifest_7284624.xml'
+          ) | sha256sum -c -
           test -x .ci-work/toolchain/clang-r416183b/bin/clang
+          .ci-work/toolchain/clang-r416183b/bin/clang --version | grep -F 'based on r416183b'
       - uses: actions/cache@v6
         with:
           path: ~/.cache/ccache
