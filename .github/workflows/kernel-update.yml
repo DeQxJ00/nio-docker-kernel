@@ -167,7 +167,14 @@ jobs:
           set -euo pipefail
           cp .ci-work/src/device/BoardConfig.mk .ci-work/src/device-BoardConfig.mk
           cp .ci-work/src/common/lineage.dependencies .ci-work/src/common-lineage.dependencies
-      - name: Configure and build
+      - name: Verify build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$GITHUB_WORKSPACE/.ci-work/toolchain/clang-r416183b/bin:/usr/lib/ccache:$PATH"
+          clang --version
+          dtc --version
+      - name: Configure kernel
         shell: bash
         run: |
           set -euo pipefail
@@ -176,10 +183,21 @@ jobs:
           export KBUILD_BUILD_USER=kernel-builder
           export KBUILD_BUILD_HOST=github-actions
           export KCONFIG_NOTIMESTAMP=true
-          clang --version
-          dtc --version
           bash scripts/apply-kernel-config.sh .ci-work/src/kernel .ci-work/out .github/kernel/docker.config
+      - name: Build kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$GITHUB_WORKSPACE/.ci-work/toolchain/clang-r416183b/bin:/usr/lib/ccache:$PATH"
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          export KBUILD_BUILD_USER=kernel-builder
+          export KBUILD_BUILD_HOST=github-actions
+          export KCONFIG_NOTIMESTAMP=true
           bash scripts/build-kernel.sh .ci-work/src/kernel .ci-work/out .ci-work/artifacts
+      - name: Record build metadata
+        shell: bash
+        run: |
+          set -euo pipefail
           printf 'upstream_key=%s\nrefs=%s\n' '${{ needs.resolve.outputs.key }}' '${{ needs.resolve.outputs.refs }}' > .ci-work/artifacts/build-metadata.txt
       - name: Package flashable images when configured
         if: ${{ vars.BASE_IMAGES_URL != '' }}
