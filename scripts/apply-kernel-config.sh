@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-kernel_dir=${1:?kernel source directory}
-out_dir=${2:?kernel output directory}
-fragment=${3:?local config fragment}
+kernel_dir=$(realpath "${1:?kernel source directory}")
+out_dir=$(realpath -m "${2:?kernel output directory}")
+fragment=$(realpath "${3:?local config fragment}")
 mkdir -p "$out_dir"
 make_args=(
   O="$out_dir"

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-kernel_dir=${1:?kernel source directory}
-out_dir=${2:?kernel output directory}
-artifact_dir=${3:?artifact directory}
+kernel_dir=$(realpath "${1:?kernel source directory}")
+out_dir=$(realpath -m "${2:?kernel output directory}")
+artifact_dir=$(realpath -m "${3:?artifact directory}")
 mkdir -p "$artifact_dir"
 make_args=(
   O="$out_dir"
