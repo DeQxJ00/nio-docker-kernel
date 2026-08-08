@@ -45,7 +45,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev ccache gcc-aarch64-linux-gnu device-tree-compiler python3 unzip
+        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev ccache device-tree-compiler python3 unzip
+      - name: Cache AOSP Clang r416183b
+        id: clang-cache
+        uses: actions/cache@v6
+        with:
+          path: .ci-work/toolchain
+          key: aosp-clang-r416183b-3f17560d9bd078537f29294c2bcf80b591821a09
+      - name: Download verified AOSP Clang r416183b
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-work/toolchain
+          url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09.tar.gz'
+          curl --fail --location --retry 3 "$url" -o .ci-work/clang.tar.gz
+          echo '0197db36b7cce8a7fd43a68862a6ab9ba2cdc88a646384ec84576eee84461a37  .ci-work/clang.tar.gz' | sha256sum -c -
+          tar -xzf .ci-work/clang.tar.gz -C .ci-work/toolchain
+          test -x .ci-work/toolchain/clang-r416183b/bin/clang
       - uses: actions/cache@v6
         with:
           path: ~/.cache/ccache
@@ -74,7 +91,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PATH="/usr/lib/ccache:$PATH"; export CCACHE_DIR="$HOME/.cache/ccache"
+          export PATH="$GITHUB_WORKSPACE/.ci-work/toolchain/clang-r416183b/bin:/usr/lib/ccache:$PATH"
+          export CCACHE_DIR="$HOME/.cache/ccache"
+          clang --version
+          dtc --version
           bash scripts/apply-kernel-config.sh .ci-work/src/kernel .ci-work/out .github/kernel/docker.config
           bash scripts/build-kernel.sh .ci-work/src/kernel .ci-work/out .ci-work/artifacts
           printf 'upstream_key=%s\nrefs=%s\n' '${{ needs.resolve.outputs.key }}' '${{ needs.resolve.outputs.refs }}' > .ci-work/artifacts/build-metadata.txt

@@ -14,6 +14,12 @@ local:
   docker_fragment: .github/kernel/docker.config
   base_kernel_release: 4.19.325-cip134-st18-perf-ge5e04d270edd
   base_kernel_commit: e5e04d270eddcbe4f020bf1507c3b3e48e2c20ad
+toolchain:
+  repository: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86
+  branch: android12-release
+  commit: 3f17560d9bd078537f29294c2bcf80b591821a09
+  directory: clang-r416183b
+  archive_sha256: 0197db36b7cce8a7fd43a68862a6ab9ba2cdc88a646384ec84576eee84461a37
 last_verified_utc: 2026-08-08
 last_verified_heads:
   android_device_motorola_nio: 2c96220a290b50d7277bf83979b02b5872235b2e

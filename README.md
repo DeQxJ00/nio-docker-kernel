@@ -8,6 +8,8 @@ The mapping is in [`upstream.yml`](upstream.yml), based on official LineageOS Gi
 
 The local `.github/kernel/docker.config` contains the container-oriented additions identified from the existing `base-only.config` → `final.config` delta. Device-specific options remain upstream-owned and are re-read from the upstream nio config on each build.
 
+The kernel is configured in the same order as the official device tree: `vendor/kona-perf_defconfig`, `moto-kona.config`, `nio-default.config`, then the local eight-symbol Docker fragment. CI uses the verified AOSP Android 12 Clang `r416183b` toolchain and external system DTC (`DTC_EXT=/usr/bin/dtc`), matching the successful standalone nio build recorded for this project.
+
 ## GitHub setup
 
 1. Create an empty GitHub repository and upload this directory. Do not upload the existing device backups or generated image dumps unless intentionally accepting that risk.
@@ -28,4 +30,3 @@ Do not flash directly to a daily-use phone. Verify codename, slot, boot/vendor_b
 - Supply and independently verify matching base images if flashable candidates are wanted.
 - Push the local files to a new repository, enable Actions, then run `workflow_dispatch` once with `force=true`.
 - Inspect metadata before any hardware test. Local historical evidence records `nio`, product `nio_retcn`, model `XT2125_4`, and kernel commit `e5e04d270edd…`; this is not a substitute for current upstream resolution.
-
