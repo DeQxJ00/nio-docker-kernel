@@ -16,24 +16,17 @@ done
 test -x "$tool"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-for image in boot vendor_boot; do
-  mkdir "$work/$image"
-  cp "$base_dir/$image.img" "$work/$image/original.img"
-  (cd "$work/$image" && "$tool" unpack original.img >/dev/null)
-  if [[ -f "$work/$image/kernel" ]]; then
-    cp "$artifact_dir/Image" "$work/$image/kernel"
-    (cd "$work/$image" && "$tool" repack original.img "$out/$image.img" >/dev/null)
-  elif [[ "$image" == vendor_boot ]]; then
-    cp "$base_dir/vendor_boot.img" "$out/vendor_boot.img"
-  else
-    echo 'boot.img did not expose a kernel during unpack' >&2
-    exit 1
-  fi
-done
+mkdir "$work/boot"
+cp "$base_dir/boot.img" "$work/boot/original.img"
+(cd "$work/boot" && "$tool" unpack original.img >/dev/null)
+test -f "$work/boot/kernel"
+cp "$artifact_dir/Image" "$work/boot/kernel"
+(cd "$work/boot" && "$tool" repack original.img "$out/boot.img" >/dev/null)
+cp "$base_dir/vendor_boot.img" "$out/vendor_boot.img"
 cp "$base_dir/dtbo.img" "$out/dtbo.img"
 printf '%s\n' \
   'boot.img is repacked from the matching official LineageOS image with the newly built Image.' \
-  'vendor_boot.img is repacked only if its format exposes a kernel; otherwise it is retained unchanged.' \
+  'vendor_boot.img is retained from the matching official LineageOS build; nio vendor_boot contains ramdisk and dtb, not the kernel.' \
   'dtbo.img is retained from the matching official LineageOS build; built DTB/DTBO files are in the parent artifact.' \
   > "$out/README.txt"
 sha256sum "$out"/*.img > "$out/SHA256SUMS"

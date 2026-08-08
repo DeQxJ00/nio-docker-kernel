@@ -20,7 +20,7 @@ The schedule runs daily at 03:17 UTC, every push to `master` runs the workflow, 
 
 ## Artifacts and safety
 
-Artifacts include `Image`, optional `Image.gz`, DTB/DTBO files, modules, the final config, a defconfig, and build metadata. `flashable/` contains a repacked boot candidate plus the matching official LineageOS vendor_boot and dtbo images; vendor_boot is repacked only if its image format actually exposes a kernel. The workflow deliberately does not rewrite `vendor.img`; that requires a device-specific AVB/ext4 procedure and fresh proprietary contents.
+Artifacts include `Image`, optional `Image.gz`, DTB/DTBO files, modules, the final config, a defconfig, and build metadata. `flashable/` contains a repacked boot candidate plus the unchanged matching official LineageOS vendor_boot and dtbo images. The nio vendor_boot contains its vendor ramdisk and DTB rather than the kernel, so only boot is repacked. The workflow deliberately does not rewrite `vendor.img`; that requires a device-specific AVB/ext4 procedure and fresh proprietary contents.
 
 Do not flash directly to a daily-use phone. Verify codename, slot, boot/vendor_boot header, AVB state, module vermagic, hashes, and a complete backup first. Prefer `fastboot boot` where supported. Keep untouched stock/LineageOS images and exact rollback commands; mismatched images can soft-brick the device or break data access.
 
