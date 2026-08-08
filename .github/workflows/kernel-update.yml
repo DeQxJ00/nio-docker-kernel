@@ -73,9 +73,11 @@ jobs:
           # stable. Verify immutable files from the pinned commit instead.
           (
             cd .ci-work/toolchain/clang-r416183b
-            echo '0fb5c52dfcf5194e12bd735e011f51267cf1aad8179b6f36adc49510553f3e7e  AndroidVersion.txt'
-            echo 'ae3fc0a3e2db8deea63b1ac0b2fc2c54c1e9c80c2406b8c9e80f78da67ba2513  manifest_7284624.xml'
-          ) | sha256sum -c -
+            printf '%s\n' \
+              '0fb5c52dfcf5194e12bd735e011f51267cf1aad8179b6f36adc49510553f3e7e  AndroidVersion.txt' \
+              'ae3fc0a3e2db8deea63b1ac0b2fc2c54c1e9c80c2406b8c9e80f78da67ba2513  manifest_7284624.xml' \
+              | sha256sum -c -
+          )
           test -x .ci-work/toolchain/clang-r416183b/bin/clang
           .ci-work/toolchain/clang-r416183b/bin/clang --version | grep -F 'based on r416183b'
       - uses: actions/cache@v6
