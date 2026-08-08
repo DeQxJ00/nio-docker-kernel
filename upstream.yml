@@ -19,6 +19,7 @@ toolchain:
   branch: android12-release
   commit: 3f17560d9bd078537f29294c2bcf80b591821a09
   directory: clang-r416183b
+  archive: https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09/clang-r416183b.tar.gz
   archive_sha256: 0197db36b7cce8a7fd43a68862a6ab9ba2cdc88a646384ec84576eee84461a37
 last_verified_utc: 2026-08-08
 last_verified_heads:

@@ -11,7 +11,7 @@ make_args=(
   DTC_EXT="${DTC_EXT:-/usr/bin/dtc}"
 )
 make -C "$kernel_dir" "${make_args[@]}" -j"$(nproc)" Image dtbs modules
-make -C "$kernel_dir" "${make_args[@]}" INSTALL_MOD_PATH="$artifact_dir/modules" modules_install
+make -C "$kernel_dir" "${make_args[@]}" INSTALL_MOD_PATH="$artifact_dir/modules" INSTALL_MOD_STRIP=1 modules_install
 cp "$out_dir/arch/arm64/boot/Image" "$artifact_dir/Image"
 if [[ -f "$out_dir/arch/arm64/boot/Image.gz" ]]; then cp "$out_dir/arch/arm64/boot/Image.gz" "$artifact_dir/Image.gz"; fi
 find "$out_dir/arch/arm64/boot/dts" -type f \( -name '*.dtb' -o -name '*.dtbo' \) -exec cp --parents {} "$artifact_dir" \;

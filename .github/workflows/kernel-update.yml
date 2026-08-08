@@ -57,11 +57,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p .ci-work/toolchain
-          url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09.tar.gz'
+          mkdir -p .ci-work/toolchain/clang-r416183b
+          url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09/clang-r416183b.tar.gz'
           curl --fail --location --retry 3 "$url" -o .ci-work/clang.tar.gz
           echo '0197db36b7cce8a7fd43a68862a6ab9ba2cdc88a646384ec84576eee84461a37  .ci-work/clang.tar.gz' | sha256sum -c -
-          tar -xzf .ci-work/clang.tar.gz -C .ci-work/toolchain
+          tar -xzf .ci-work/clang.tar.gz -C .ci-work/toolchain/clang-r416183b
           test -x .ci-work/toolchain/clang-r416183b/bin/clang
       - uses: actions/cache@v6
         with:
@@ -93,6 +93,9 @@ jobs:
           set -euo pipefail
           export PATH="$GITHUB_WORKSPACE/.ci-work/toolchain/clang-r416183b/bin:/usr/lib/ccache:$PATH"
           export CCACHE_DIR="$HOME/.cache/ccache"
+          export KBUILD_BUILD_USER=kernel-builder
+          export KBUILD_BUILD_HOST=github-actions
+          export KCONFIG_NOTIMESTAMP=true
           clang --version
           dtc --version
           bash scripts/apply-kernel-config.sh .ci-work/src/kernel .ci-work/out .github/kernel/docker.config
