@@ -102,6 +102,7 @@ jobs:
           boot_url=${base[1]}; boot_sha256=${base[2]}
           vendor_boot_url=${base[3]}; vendor_boot_sha256=${base[4]}
           dtbo_url=${base[5]}; dtbo_sha256=${base[6]}
+          local_inputs=$(git ls-files -s -- .github/kernel .github/workflows scripts upstream.yml | sha256sum | cut -d' ' -f1)
           refs=(
             "android_device_motorola_nio=$device"
             "android_device_motorola_sm8250-common=$common"
@@ -111,6 +112,7 @@ jobs:
             "lineage_boot=$boot_sha256"
             "lineage_vendor_boot=$vendor_boot_sha256"
             "lineage_dtbo=$dtbo_sha256"
+            "local_inputs=$local_inputs"
           )
           key=$(printf '%s\n' "${refs[@]}" | sha256sum | cut -d' ' -f1)
           changed=true
@@ -166,6 +168,7 @@ jobs:
         with:
           path: ~/.cache/ccache
           key: ccache-nio-${{ hashFiles('upstream.yml', '.github/kernel/docker.config') }}
+          restore-keys: ccache-nio-
       - name: Fetch upstream kernel
         uses: actions/checkout@v7
         with:
