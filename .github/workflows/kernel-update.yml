@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v7
       - id: branch
         shell: bash
-        run: echo "branch=$(awk '/^  branch:/{print $2}' upstream.yml)" >> "$GITHUB_OUTPUT"
+        run: echo "branch=$(awk '/^  branch:/{print $2; exit}' upstream.yml)" >> "$GITHUB_OUTPUT"
       - name: Resolve nio device head
         uses: actions/checkout@v7
         with:
