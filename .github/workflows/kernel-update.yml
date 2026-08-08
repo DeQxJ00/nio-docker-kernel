@@ -41,10 +41,7 @@ jobs:
           repos=(android_device_motorola_nio android_device_motorola_sm8250-common android_kernel_motorola_sm8250 android_hardware_motorola)
           refs=()
           for repo in "${repos[@]}"; do
-            response=$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
-              -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
-              "https://api.github.com/repos/LineageOS/$repo/git/ref/heads/$branch")
-            sha=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])' <<< "$response")
+            sha=$(gh api --method GET "repos/LineageOS/$repo/git/ref/heads/$branch" --jq '.object.sha')
             [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Cannot resolve $repo $branch"; exit 1; }
             refs+=("$repo=$sha")
             case "$repo" in
@@ -56,8 +53,8 @@ jobs:
             printf '%s=%s\n' "$output" "$sha" >> "$GITHUB_OUTPUT"
           done
           key=$(printf '%s\n' "${refs[@]}" | sha256sum | cut -d' ' -f1)
-          previous=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/ci-state-$key" | awk '{print $1}') || true
-          changed=true; [[ -n "$previous" ]] && changed=false
+          changed=true
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/git/ref/tags/ci-state-$key" >/dev/null 2>&1 && changed=false || true
           printf 'changed=%s\nkey=%s\nrefs=%s\n' "$changed" "$key" "$(IFS=,; echo "${refs[*]}")" >> "$GITHUB_OUTPUT"
   build:
     needs: resolve
