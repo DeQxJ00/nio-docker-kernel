@@ -37,7 +37,7 @@ jobs:
           for repo in "${repos[@]}"; do
             sha=
             for attempt in 1 2 3; do
-              if remote_ref=$(git -c http.version=HTTP/1.1 ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch"); then
+              if remote_ref=$(git ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch"); then
                 sha=$(awk '{print $1}' <<< "$remote_ref")
                 [[ "$sha" =~ ^[0-9a-f]{40}$ ]] && break
               fi
@@ -109,7 +109,7 @@ jobs:
           git init .ci-work/src/kernel
           git -C .ci-work/src/kernel remote add origin https://github.com/LineageOS/android_kernel_motorola_sm8250.git
           for attempt in 1 2 3; do
-            git -c http.version=HTTP/1.1 -C .ci-work/src/kernel fetch --depth=1 origin "$kernel_commit" && break
+            git -C .ci-work/src/kernel fetch --depth=1 origin "$kernel_commit" && break
             [[ "$attempt" == 3 ]] && exit 1
             sleep $((attempt * 5))
           done
@@ -127,7 +127,7 @@ jobs:
             git init "$target"
             git -C "$target" remote add origin "https://github.com/LineageOS/$repo.git"
             for attempt in 1 2 3; do
-              git -c http.version=HTTP/1.1 -C "$target" fetch --depth=1 origin "$commit" && break
+              git -C "$target" fetch --depth=1 origin "$commit" && break
               [[ "$attempt" == 3 ]] && exit 1
               sleep $((attempt * 5))
             done
