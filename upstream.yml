@@ -1,0 +1,25 @@
+schema: 1
+lineage:
+  branch: lineage-23.2
+  manifest: https://github.com/LineageOS/android.git
+  device: https://github.com/LineageOS/android_device_motorola_nio.git
+  common: https://github.com/LineageOS/android_device_motorola_sm8250-common.git
+  kernel: https://github.com/LineageOS/android_kernel_motorola_sm8250.git
+  hardware: https://github.com/LineageOS/android_hardware_motorola.git
+  device_codename: nio
+  product: nio_retcn
+  kernel_path: kernel/motorola/sm8250
+  config_fragment: arch/arm64/configs/vendor/ext_config/nio-default.config
+local:
+  docker_fragment: .github/kernel/docker.config
+  base_kernel_release: 4.19.325-cip134-st18-perf-ge5e04d270edd
+  base_kernel_commit: e5e04d270eddcbe4f020bf1507c3b3e48e2c20ad
+last_verified_utc: 2026-08-08
+last_verified_heads:
+  android_device_motorola_nio: 2c96220a290b50d7277bf83979b02b5872235b2e
+  android_device_motorola_sm8250-common: 70dce563a3233a03e4a26c9a1078b76529a0636a
+  android_kernel_motorola_sm8250: 377552fc05c97f9fffe68309799b22daddb71329
+  android_hardware_motorola: ffd5182343fb63227308f0f8b268358e3bd2a3b6
+notes:
+  - Vendor proprietary blobs and base partition images are not redistributed here.
+  - The exact upstream commit used by each build is recorded in build-metadata.txt.

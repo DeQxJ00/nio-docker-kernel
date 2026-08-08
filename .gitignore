@@ -1,0 +1,9 @@
+# Generated CI workspaces and downloaded upstream trees
+.ci-work/
+out/
+artifacts/
+base-images/
+*.img
+*.pem
+*.key
+

@@ -1,0 +1,110 @@
+name: nio kernel update
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Build even when upstream coordinates did not change
+        required: false
+        default: false
+        type: boolean
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: nio-kernel-update
+  cancel-in-progress: false
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      changed: ${{ steps.resolve.outputs.changed }}
+      key: ${{ steps.resolve.outputs.key }}
+      refs: ${{ steps.resolve.outputs.refs }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=$(awk '/^  branch:/{print $2}' upstream.yml)
+          repos=(android_device_motorola_nio android_device_motorola_sm8250-common android_kernel_motorola_sm8250 android_hardware_motorola)
+          refs=()
+          for repo in "${repos[@]}"; do refs+=("$repo=$(git ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch" | awk '{print $1}')"); done
+          key=$(printf '%s\n' "${refs[@]}" | sha256sum | cut -d' ' -f1)
+          previous=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/ci-state-$key" | awk '{print $1}') || true
+          changed=true; [[ -n "$previous" ]] && changed=false
+          printf 'changed=%s\nkey=%s\nrefs=%s\n' "$changed" "$key" "$(IFS=,; echo "${refs[*]}")" >> "$GITHUB_OUTPUT"
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.changed == 'true' || inputs.force == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev ccache gcc-aarch64-linux-gnu device-tree-compiler python3 unzip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-nio-${{ hashFiles('upstream.yml', '.github/kernel/docker.config') }}
+      - name: Fetch upstream kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-work/src .ci-work/out
+          branch=$(awk '/^  branch:/{print $2}' upstream.yml)
+          git clone --filter=blob:none --no-checkout --branch "$branch" https://github.com/LineageOS/android_kernel_motorola_sm8250.git .ci-work/src/kernel
+          git -C .ci-work/src/kernel checkout --detach "$(git ls-remote https://github.com/LineageOS/android_kernel_motorola_sm8250.git "refs/heads/$branch" | awk '{print $1}')"
+      - name: Fetch upstream device metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=$(awk '/^  branch:/{print $2}' upstream.yml)
+          for spec in 'device android_device_motorola_nio' 'common android_device_motorola_sm8250-common' 'hardware android_hardware_motorola'; do
+            read -r name repo <<< "$spec"; target=.ci-work/src/$name
+            git clone --filter=blob:none --no-checkout --branch "$branch" "https://github.com/LineageOS/$repo.git" "$target"
+            git -C "$target" checkout --detach "$(git ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch" | awk '{print $1}')"
+          done
+          cp .ci-work/src/device/android_device_motorola_nio/BoardConfig.mk .ci-work/src/device-BoardConfig.mk
+          cp .ci-work/src/common/android_device_motorola_sm8250-common/lineage.dependencies .ci-work/src/common-lineage.dependencies
+      - name: Configure and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/ccache:$PATH"; export CCACHE_DIR="$HOME/.cache/ccache"
+          bash scripts/apply-kernel-config.sh .ci-work/src/kernel .ci-work/out .github/kernel/docker.config
+          bash scripts/build-kernel.sh .ci-work/src/kernel .ci-work/out .ci-work/artifacts
+          printf 'upstream_key=%s\nrefs=%s\n' '${{ needs.resolve.outputs.key }}' '${{ needs.resolve.outputs.refs }}' > .ci-work/artifacts/build-metadata.txt
+      - name: Package flashable images when configured
+        if: ${{ vars.BASE_IMAGES_URL != '' }}
+        env:
+          BASE_IMAGES_URL: ${{ vars.BASE_IMAGES_URL }}
+          BASE_IMAGES_SHA256: ${{ secrets.BASE_IMAGES_SHA256 }}
+          MAGISKBOOT_URL: ${{ vars.MAGISKBOOT_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-work/base-images
+          curl --fail --location --retry 3 "$BASE_IMAGES_URL" -o .ci-work/base-images/base.zip
+          [[ -z "$BASE_IMAGES_SHA256" ]] || echo "$BASE_IMAGES_SHA256  .ci-work/base-images/base.zip" | sha256sum -c -
+          unzip -q .ci-work/base-images/base.zip -d .ci-work/base-images
+          curl --fail --location --retry 3 "$MAGISKBOOT_URL" -o .ci-work/magiskboot
+          chmod +x .ci-work/magiskboot
+          MAGISKBOOT=.ci-work/magiskboot bash scripts/package-images.sh .ci-work/artifacts .ci-work/base-images
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nio-kernel-${{ needs.resolve.outputs.key }}
+          path: .ci-work/artifacts
+          if-no-files-found: error
+          retention-days: 30
+      - name: Create release after successful changed build
+        if: success() && needs.resolve.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tar -czf ".ci-work/nio-kernel-${{ needs.resolve.outputs.key }}.tar.gz" -C .ci-work/artifacts .
+          gh release create "lineage-23.2-${{ needs.resolve.outputs.key }}" ".ci-work/nio-kernel-${{ needs.resolve.outputs.key }}.tar.gz" --title "nio kernel ${{ needs.resolve.outputs.key }}" --generate-notes
+          git tag "ci-state-${{ needs.resolve.outputs.key }}"
+          git push origin "ci-state-${{ needs.resolve.outputs.key }}"
