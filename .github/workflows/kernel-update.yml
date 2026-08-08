@@ -24,7 +24,7 @@ jobs:
       key: ${{ steps.resolve.outputs.key }}
       refs: ${{ steps.resolve.outputs.refs }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: resolve
         shell: bash
         run: |
@@ -43,10 +43,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev libelf-dev ccache gcc-aarch64-linux-gnu device-tree-compiler python3 unzip
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/ccache
           key: ccache-nio-${{ hashFiles('upstream.yml', '.github/kernel/docker.config') }}
@@ -68,8 +68,8 @@ jobs:
             git clone --filter=blob:none --no-checkout --branch "$branch" "https://github.com/LineageOS/$repo.git" "$target"
             git -C "$target" checkout --detach "$(git ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch" | awk '{print $1}')"
           done
-          cp .ci-work/src/device/android_device_motorola_nio/BoardConfig.mk .ci-work/src/device-BoardConfig.mk
-          cp .ci-work/src/common/android_device_motorola_sm8250-common/lineage.dependencies .ci-work/src/common-lineage.dependencies
+          cp .ci-work/src/device/BoardConfig.mk .ci-work/src/device-BoardConfig.mk
+          cp .ci-work/src/common/lineage.dependencies .ci-work/src/common-lineage.dependencies
       - name: Configure and build
         shell: bash
         run: |
@@ -93,7 +93,7 @@ jobs:
           curl --fail --location --retry 3 "$MAGISKBOOT_URL" -o .ci-work/magiskboot
           chmod +x .ci-work/magiskboot
           MAGISKBOOT=.ci-work/magiskboot bash scripts/package-images.sh .ci-work/artifacts .ci-work/base-images
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: nio-kernel-${{ needs.resolve.outputs.key }}
           path: .ci-work/artifacts
