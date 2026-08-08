@@ -278,6 +278,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tar -czf ".ci-work/nio-kernel-${{ needs.resolve.outputs.key }}.tar.gz" -C .ci-work/artifacts .
-          gh release create "lineage-23.2-${{ needs.resolve.outputs.key }}" ".ci-work/nio-kernel-${{ needs.resolve.outputs.key }}.tar.gz" --title "nio kernel ${{ needs.resolve.outputs.key }}" --generate-notes
+          gh release create "lineage-23.2-${{ needs.resolve.outputs.key }}" ".ci-work/nio-kernel-${{ needs.resolve.outputs.key }}.tar.gz" --title "nio kernel ${{ needs.resolve.outputs.key }}" --generate-notes --latest
           git tag "ci-state-${{ needs.resolve.outputs.key }}"
           git push origin "ci-state-${{ needs.resolve.outputs.key }}"
