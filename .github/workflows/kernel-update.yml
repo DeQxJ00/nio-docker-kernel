@@ -31,31 +31,60 @@ jobs:
       hardware: ${{ steps.resolve.outputs.hardware }}
     steps:
       - uses: actions/checkout@v7
+      - id: branch
+        shell: bash
+        run: echo "branch=$(awk '/^  branch:/{print $2}' upstream.yml)" >> "$GITHUB_OUTPUT"
+      - name: Resolve nio device head
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_device_motorola_nio
+          ref: ${{ steps.branch.outputs.branch }}
+          path: .ci-resolve/device
+          fetch-depth: 1
+          sparse-checkout: BoardConfig.mk
+      - name: Resolve sm8250-common head
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_device_motorola_sm8250-common
+          ref: ${{ steps.branch.outputs.branch }}
+          path: .ci-resolve/common
+          fetch-depth: 1
+          sparse-checkout: lineage.dependencies
+      - name: Resolve kernel head
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_kernel_motorola_sm8250
+          ref: ${{ steps.branch.outputs.branch }}
+          path: .ci-resolve/kernel
+          fetch-depth: 1
+          sparse-checkout: Makefile
+      - name: Resolve Motorola hardware head
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_hardware_motorola
+          ref: ${{ steps.branch.outputs.branch }}
+          path: .ci-resolve/hardware
+          fetch-depth: 1
+          sparse-checkout: Android.bp
       - id: resolve
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          branch=$(awk '/^  branch:/{print $2}' upstream.yml)
-          repos=(android_device_motorola_nio android_device_motorola_sm8250-common android_kernel_motorola_sm8250 android_hardware_motorola)
-          refs=()
-          for repo in "${repos[@]}"; do
-            sha=$(gh api --method GET "repos/LineageOS/$repo/git/ref/heads/$branch" --jq '.object.sha')
-            [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Cannot resolve $repo $branch"; exit 1; }
-            refs+=("$repo=$sha")
-            case "$repo" in
-              android_device_motorola_nio) output=device ;;
-              android_device_motorola_sm8250-common) output=common ;;
-              android_kernel_motorola_sm8250) output=kernel ;;
-              android_hardware_motorola) output=hardware ;;
-            esac
-            printf '%s=%s\n' "$output" "$sha" >> "$GITHUB_OUTPUT"
-          done
+          device=$(git -C .ci-resolve/device rev-parse HEAD)
+          common=$(git -C .ci-resolve/common rev-parse HEAD)
+          kernel=$(git -C .ci-resolve/kernel rev-parse HEAD)
+          hardware=$(git -C .ci-resolve/hardware rev-parse HEAD)
+          refs=(
+            "android_device_motorola_nio=$device"
+            "android_device_motorola_sm8250-common=$common"
+            "android_kernel_motorola_sm8250=$kernel"
+            "android_hardware_motorola=$hardware"
+          )
           key=$(printf '%s\n' "${refs[@]}" | sha256sum | cut -d' ' -f1)
           changed=true
-          gh api --method GET "repos/${GITHUB_REPOSITORY}/git/ref/tags/ci-state-$key" >/dev/null 2>&1 && changed=false || true
-          printf 'changed=%s\nkey=%s\nrefs=%s\n' "$changed" "$key" "$(IFS=,; echo "${refs[*]}")" >> "$GITHUB_OUTPUT"
+          git ls-remote --exit-code origin "refs/tags/ci-state-$key" >/dev/null 2>&1 && changed=false || true
+          printf 'changed=%s\nkey=%s\nrefs=%s\ndevice=%s\ncommon=%s\nkernel=%s\nhardware=%s\n' \
+            "$changed" "$key" "$(IFS=,; echo "${refs[*]}")" "$device" "$common" "$kernel" "$hardware" >> "$GITHUB_OUTPUT"
   build:
     needs: resolve
     if: needs.resolve.outputs.changed == 'true' || inputs.force == true
