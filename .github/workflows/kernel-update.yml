@@ -54,16 +54,26 @@ jobs:
         with:
           path: .ci-work/toolchain
           key: aosp-clang-r416183b-3f17560d9bd078537f29294c2bcf80b591821a09-v2
-      - name: Download verified AOSP Clang r416183b
+      - name: Download AOSP Clang r416183b archive
         if: steps.clang-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          trap 'status=$?; echo "::error title=AOSP Clang setup failed::line ${LINENO}: ${BASH_COMMAND} (exit ${status})"; exit "$status"' ERR
-          mkdir -p .ci-work/toolchain/clang-r416183b
           url='https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/3f17560d9bd078537f29294c2bcf80b591821a09/clang-r416183b.tar.gz'
-          curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 "$url" -o .ci-work/clang.tar.gz
+          mkdir -p .ci-work
+          curl --fail --silent --show-error --location --retry 5 --retry-all-errors --connect-timeout 30 "$url" -o .ci-work/clang.tar.gz
+      - name: Extract AOSP Clang r416183b
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-work/toolchain/clang-r416183b
           tar -xzf .ci-work/clang.tar.gz -C .ci-work/toolchain/clang-r416183b
+      - name: Verify AOSP Clang r416183b contents
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
           # Gitiles regenerates gzip containers, so their archive SHA-256 is not
           # stable. Verify immutable files from the pinned commit instead.
           (
