@@ -29,6 +29,13 @@ jobs:
       common: ${{ steps.resolve.outputs.common }}
       kernel: ${{ steps.resolve.outputs.kernel }}
       hardware: ${{ steps.resolve.outputs.hardware }}
+      lineage_build: ${{ steps.resolve.outputs.lineage_build }}
+      boot_url: ${{ steps.resolve.outputs.boot_url }}
+      boot_sha256: ${{ steps.resolve.outputs.boot_sha256 }}
+      vendor_boot_url: ${{ steps.resolve.outputs.vendor_boot_url }}
+      vendor_boot_sha256: ${{ steps.resolve.outputs.vendor_boot_sha256 }}
+      dtbo_url: ${{ steps.resolve.outputs.dtbo_url }}
+      dtbo_sha256: ${{ steps.resolve.outputs.dtbo_sha256 }}
     steps:
       - uses: actions/checkout@v7
       - id: branch
@@ -74,17 +81,43 @@ jobs:
           common=$(git -C .ci-resolve/common rev-parse HEAD)
           kernel=$(git -C .ci-resolve/kernel rev-parse HEAD)
           hardware=$(git -C .ci-resolve/hardware rev-parse HEAD)
+          lineage_version='${{ steps.branch.outputs.branch }}'
+          lineage_version=${lineage_version#lineage-}
+          builds=$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
+            https://download.lineageos.org/api/v2/devices/nio/builds)
+          mapfile -t base < <(python3 -c '
+          import json, sys
+          version = sys.argv[1]
+          matching = [item for item in json.load(sys.stdin) if item["version"] == version]
+          build = max(matching, key=lambda item: item["datetime"])
+          files = {item["filename"]: item for item in build["files"]}
+          ota = next(item for item in build["files"] if item["filename"].endswith("-signed.zip"))
+          print(ota["filename"])
+          for name in ("boot.img", "vendor_boot.img", "dtbo.img"):
+              print(files[name]["url"])
+              print(files[name]["sha256"])
+          ' "$lineage_version" <<< "$builds")
+          [[ ${#base[@]} == 7 ]]
+          lineage_build=${base[0]}
+          boot_url=${base[1]}; boot_sha256=${base[2]}
+          vendor_boot_url=${base[3]}; vendor_boot_sha256=${base[4]}
+          dtbo_url=${base[5]}; dtbo_sha256=${base[6]}
           refs=(
             "android_device_motorola_nio=$device"
             "android_device_motorola_sm8250-common=$common"
             "android_kernel_motorola_sm8250=$kernel"
             "android_hardware_motorola=$hardware"
+            "lineage_build=$lineage_build"
+            "lineage_boot=$boot_sha256"
+            "lineage_vendor_boot=$vendor_boot_sha256"
+            "lineage_dtbo=$dtbo_sha256"
           )
           key=$(printf '%s\n' "${refs[@]}" | sha256sum | cut -d' ' -f1)
           changed=true
           git ls-remote --exit-code origin "refs/tags/ci-state-$key" >/dev/null 2>&1 && changed=false || true
-          printf 'changed=%s\nkey=%s\nrefs=%s\ndevice=%s\ncommon=%s\nkernel=%s\nhardware=%s\n' \
-            "$changed" "$key" "$(IFS=,; echo "${refs[*]}")" "$device" "$common" "$kernel" "$hardware" >> "$GITHUB_OUTPUT"
+          printf 'changed=%s\nkey=%s\nrefs=%s\ndevice=%s\ncommon=%s\nkernel=%s\nhardware=%s\nlineage_build=%s\nboot_url=%s\nboot_sha256=%s\nvendor_boot_url=%s\nvendor_boot_sha256=%s\ndtbo_url=%s\ndtbo_sha256=%s\n' \
+            "$changed" "$key" "$(IFS=,; echo "${refs[*]}")" "$device" "$common" "$kernel" "$hardware" \
+            "$lineage_build" "$boot_url" "$boot_sha256" "$vendor_boot_url" "$vendor_boot_sha256" "$dtbo_url" "$dtbo_sha256" >> "$GITHUB_OUTPUT"
   build:
     needs: resolve
     if: needs.resolve.outputs.changed == 'true' || inputs.force == true
@@ -198,20 +231,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf 'upstream_key=%s\nrefs=%s\n' '${{ needs.resolve.outputs.key }}' '${{ needs.resolve.outputs.refs }}' > .ci-work/artifacts/build-metadata.txt
-      - name: Package flashable images when configured
-        if: ${{ vars.BASE_IMAGES_URL != '' }}
+          printf 'upstream_key=%s\nrefs=%s\nlineage_build=%s\n' \
+            '${{ needs.resolve.outputs.key }}' '${{ needs.resolve.outputs.refs }}' '${{ needs.resolve.outputs.lineage_build }}' \
+            > .ci-work/artifacts/build-metadata.txt
+      - name: Download verified official LineageOS base images
         env:
-          BASE_IMAGES_URL: ${{ vars.BASE_IMAGES_URL }}
-          BASE_IMAGES_SHA256: ${{ secrets.BASE_IMAGES_SHA256 }}
-          MAGISKBOOT_URL: ${{ vars.MAGISKBOOT_URL }}
+          BOOT_URL: ${{ needs.resolve.outputs.boot_url }}
+          BOOT_SHA256: ${{ needs.resolve.outputs.boot_sha256 }}
+          VENDOR_BOOT_URL: ${{ needs.resolve.outputs.vendor_boot_url }}
+          VENDOR_BOOT_SHA256: ${{ needs.resolve.outputs.vendor_boot_sha256 }}
+          DTBO_URL: ${{ needs.resolve.outputs.dtbo_url }}
+          DTBO_SHA256: ${{ needs.resolve.outputs.dtbo_sha256 }}
         run: |
           set -euo pipefail
           mkdir -p .ci-work/base-images
-          curl --fail --location --retry 3 "$BASE_IMAGES_URL" -o .ci-work/base-images/base.zip
-          [[ -z "$BASE_IMAGES_SHA256" ]] || echo "$BASE_IMAGES_SHA256  .ci-work/base-images/base.zip" | sha256sum -c -
-          unzip -q .ci-work/base-images/base.zip -d .ci-work/base-images
-          curl --fail --location --retry 3 "$MAGISKBOOT_URL" -o .ci-work/magiskboot
+          curl --fail --location --retry 5 --retry-all-errors "$BOOT_URL" -o .ci-work/base-images/boot.img
+          curl --fail --location --retry 5 --retry-all-errors "$VENDOR_BOOT_URL" -o .ci-work/base-images/vendor_boot.img
+          curl --fail --location --retry 5 --retry-all-errors "$DTBO_URL" -o .ci-work/base-images/dtbo.img
+          printf '%s\n' \
+            "$BOOT_SHA256  .ci-work/base-images/boot.img" \
+            "$VENDOR_BOOT_SHA256  .ci-work/base-images/vendor_boot.img" \
+            "$DTBO_SHA256  .ci-work/base-images/dtbo.img" \
+            | sha256sum -c -
+      - name: Package official LineageOS flashable candidates
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 5 --retry-all-errors \
+            https://github.com/topjohnwu/Magisk/releases/download/v30.7/Magisk-v30.7.apk \
+            -o .ci-work/Magisk-v30.7.apk
+          echo 'e0d32d2123532860f97123d927b1bb86c4e08e6fd8a48bfc6b5bee0afae9ebd5  .ci-work/Magisk-v30.7.apk' | sha256sum -c -
+          unzip -p .ci-work/Magisk-v30.7.apk lib/x86_64/libmagiskboot.so > .ci-work/magiskboot
           chmod +x .ci-work/magiskboot
           MAGISKBOOT=.ci-work/magiskboot bash scripts/package-images.sh .ci-work/artifacts .ci-work/base-images
       - uses: actions/upload-artifact@v7

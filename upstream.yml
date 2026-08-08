@@ -10,6 +10,7 @@ lineage:
   product: nio_retcn
   kernel_path: kernel/motorola/sm8250
   config_fragment: arch/arm64/configs/vendor/ext_config/nio-default.config
+  downloads_api: https://download.lineageos.org/api/v2/devices/nio/builds
 local:
   docker_fragment: .github/kernel/docker.config
   base_kernel_release: 4.19.325-cip134-st18-perf-ge5e04d270edd
