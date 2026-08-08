@@ -25,26 +25,35 @@ jobs:
       changed: ${{ steps.resolve.outputs.changed }}
       key: ${{ steps.resolve.outputs.key }}
       refs: ${{ steps.resolve.outputs.refs }}
+      device: ${{ steps.resolve.outputs.device }}
+      common: ${{ steps.resolve.outputs.common }}
+      kernel: ${{ steps.resolve.outputs.kernel }}
+      hardware: ${{ steps.resolve.outputs.hardware }}
     steps:
       - uses: actions/checkout@v7
       - id: resolve
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           branch=$(awk '/^  branch:/{print $2}' upstream.yml)
           repos=(android_device_motorola_nio android_device_motorola_sm8250-common android_kernel_motorola_sm8250 android_hardware_motorola)
           refs=()
           for repo in "${repos[@]}"; do
-            sha=
-            for attempt in 1 2 3; do
-              if remote_ref=$(git ls-remote "https://github.com/LineageOS/$repo.git" "refs/heads/$branch"); then
-                sha=$(awk '{print $1}' <<< "$remote_ref")
-                [[ "$sha" =~ ^[0-9a-f]{40}$ ]] && break
-              fi
-              sleep $((attempt * 5))
-            done
+            response=$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
+              -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/LineageOS/$repo/git/ref/heads/$branch")
+            sha=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])' <<< "$response")
             [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Cannot resolve $repo $branch"; exit 1; }
             refs+=("$repo=$sha")
+            case "$repo" in
+              android_device_motorola_nio) output=device ;;
+              android_device_motorola_sm8250-common) output=common ;;
+              android_kernel_motorola_sm8250) output=kernel ;;
+              android_hardware_motorola) output=hardware ;;
+            esac
+            printf '%s=%s\n' "$output" "$sha" >> "$GITHUB_OUTPUT"
           done
           key=$(printf '%s\n' "${refs[@]}" | sha256sum | cut -d' ' -f1)
           previous=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/ci-state-$key" | awk '{print $1}') || true
@@ -99,40 +108,37 @@ jobs:
           path: ~/.cache/ccache
           key: ccache-nio-${{ hashFiles('upstream.yml', '.github/kernel/docker.config') }}
       - name: Fetch upstream kernel
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_kernel_motorola_sm8250
+          ref: ${{ needs.resolve.outputs.kernel }}
+          path: .ci-work/src/kernel
+          fetch-depth: 1
+      - name: Fetch nio device tree
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_device_motorola_nio
+          ref: ${{ needs.resolve.outputs.device }}
+          path: .ci-work/src/device
+          fetch-depth: 1
+      - name: Fetch sm8250-common device tree
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_device_motorola_sm8250-common
+          ref: ${{ needs.resolve.outputs.common }}
+          path: .ci-work/src/common
+          fetch-depth: 1
+      - name: Fetch Motorola hardware tree
+        uses: actions/checkout@v7
+        with:
+          repository: LineageOS/android_hardware_motorola
+          ref: ${{ needs.resolve.outputs.hardware }}
+          path: .ci-work/src/hardware
+          fetch-depth: 1
+      - name: Record upstream device metadata
         shell: bash
         run: |
           set -euo pipefail
-          refs='${{ needs.resolve.outputs.refs }}'
-          kernel_commit=$(tr ',' '\n' <<< "$refs" | sed -n 's/^android_kernel_motorola_sm8250=//p')
-          [[ "$kernel_commit" =~ ^[0-9a-f]{40}$ ]]
-          mkdir -p .ci-work/src .ci-work/out
-          git init .ci-work/src/kernel
-          git -C .ci-work/src/kernel remote add origin https://github.com/LineageOS/android_kernel_motorola_sm8250.git
-          for attempt in 1 2 3; do
-            git -C .ci-work/src/kernel fetch --depth=1 origin "$kernel_commit" && break
-            [[ "$attempt" == 3 ]] && exit 1
-            sleep $((attempt * 5))
-          done
-          git -C .ci-work/src/kernel checkout --detach FETCH_HEAD
-      - name: Fetch upstream device metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          refs='${{ needs.resolve.outputs.refs }}'
-          for spec in 'device android_device_motorola_nio' 'common android_device_motorola_sm8250-common' 'hardware android_hardware_motorola'; do
-            read -r name repo <<< "$spec"
-            commit=$(tr ',' '\n' <<< "$refs" | sed -n "s/^$repo=//p")
-            [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
-            target=.ci-work/src/$name
-            git init "$target"
-            git -C "$target" remote add origin "https://github.com/LineageOS/$repo.git"
-            for attempt in 1 2 3; do
-              git -C "$target" fetch --depth=1 origin "$commit" && break
-              [[ "$attempt" == 3 ]] && exit 1
-              sleep $((attempt * 5))
-            done
-            git -C "$target" checkout --detach FETCH_HEAD
-          done
           cp .ci-work/src/device/BoardConfig.mk .ci-work/src/device-BoardConfig.mk
           cp .ci-work/src/common/lineage.dependencies .ci-work/src/common-lineage.dependencies
       - name: Configure and build
